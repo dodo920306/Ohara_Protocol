@@ -462,6 +462,11 @@ contract The_Ohara_Protocol is ERC1155, AccessControl, Pausable, ERC1155Burnable
         uint256 total = price + publisherRevenueFee + marketFee; // 應付價格 = 電子書價格 + 出版商收益 + 手續費
         require(msg.value >= total, "Insufficient Ether");
 
+        // 處理電子書掛單資訊
+        listings[id][seller].listedBalance --;
+        listings[id][seller].buyerCounts --;
+        listings[id][seller].buyers[uint256(index)] = address(0);
+
         // 執行轉帳
         super._safeTransferFrom(seller, buyer, id, 1, ""); // 轉移電子書給買家
         
@@ -473,11 +478,6 @@ contract The_Ohara_Protocol is ERC1155, AccessControl, Pausable, ERC1155Burnable
         if (msg.value - total > 0) { // 將剩餘 ETH 轉回給買家
             buyer.transfer(msg.value - total);
         }
-
-        // 處理電子書掛單資訊
-        listings[id][seller].listedBalance --;
-        listings[id][seller].buyerCounts --;
-        listings[id][seller].buyers[uint256(index)] = address(0);
 
         if (listings[id][seller].buyerCounts == 0) { // 當前已匹配的買家都已經完成交易
             _revokeApprovalFromContract(seller);

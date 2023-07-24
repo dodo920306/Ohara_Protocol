@@ -96,6 +96,13 @@ contract Ohara_Protocol is Initializable, ERC1155Upgradeable, AccessControlUpgra
         _setURI(newuri);
     }
 
+    function _asSingletonArray_(uint256 element) private pure returns (uint256[] memory) {
+        uint256[] memory array = new uint256[](1);
+        array[0] = element;
+
+        return array;
+    }
+
     /**
      * @dev The publisher who wants to claim an account belongs to them must use this function
      * with the magic string that represents themselves.
@@ -179,7 +186,7 @@ contract Ohara_Protocol is Initializable, ERC1155Upgradeable, AccessControlUpgra
     function mint(address to, uint256 id, uint256 amount, bytes memory data)
         public
         whenNotPaused
-        isIdExisted(_asSingletonArray(id))
+        isIdExisted(_asSingletonArray_(id))
         onlyRole(idToDetail[id].publisher)
     {
         require(totalSupply(id) + amount <= idToDetail[id].totalAmount, "ERC1155: Mint amount exceeds.");
@@ -198,7 +205,7 @@ contract Ohara_Protocol is Initializable, ERC1155Upgradeable, AccessControlUpgra
         _mintBatch(to, ids, amounts, data);
     }
 
-    function safeTransferFrom(address from, address to, uint256 id, uint256 amount, bytes memory data) public isBalanceValid(from, _asSingletonArray(id), _asSingletonArray(amount)) override(ERC1155Upgradeable) {
+    function safeTransferFrom(address from, address to, uint256 id, uint256 amount, bytes memory data) public isBalanceValid(from, _asSingletonArray_(id), _asSingletonArray_(amount)) override(ERC1155Upgradeable) {
         super.safeTransferFrom(from, to, id, amount, data);
     }
 
@@ -224,7 +231,7 @@ contract Ohara_Protocol is Initializable, ERC1155Upgradeable, AccessControlUpgra
 
     // ----------------------- Market functions -----------------------
     // Tim: 上架電子書
-    function listEBook(uint256 id, uint256 price, uint256 amount) public virtual whenNotPaused isIdExisted(_asSingletonArray(id)) isAddressValid(_msgSender()) isAmountValid(amount) isBalanceValid(_msgSender(), _asSingletonArray(id), _asSingletonArray(amount)) {
+    function listEBook(uint256 id, uint256 price, uint256 amount) public virtual whenNotPaused isIdExisted(_asSingletonArray_(id)) isAddressValid(_msgSender()) isAmountValid(amount) isBalanceValid(_msgSender(), _asSingletonArray_(id), _asSingletonArray_(amount)) {
         idToListings[id][_msgSender()].price = price;
 
         idToListings[id][_msgSender()].listedBalance += amount;
@@ -264,6 +271,9 @@ contract Ohara_Protocol is Initializable, ERC1155Upgradeable, AccessControlUpgra
         uint256 total = price + revenueFee + marketFee; // 應付價格 = 電子書價格 + 出版商收益 + 手續費
         require(msg.value >= total, "Insufficient Ether");
 
+        // 處理電子書掛單資訊
+        idToListings[id][seller].listedBalance -= amount;
+
         // 執行轉帳
         bool sent;
         _safeTransferFrom(seller, _msgSender(), id, amount, ""); // 轉移電子書給買家
@@ -279,8 +289,6 @@ contract Ohara_Protocol is Initializable, ERC1155Upgradeable, AccessControlUpgra
         if (msg.value - total > 0) (sent, ) = buyer.call{value: msg.value - total}(""); // 將剩餘 ETH 轉回給買家
 
         require(sent, "Transfer failed.");
-        // 處理電子書掛單資訊
-        idToListings[id][seller].listedBalance -= amount;
 
         emit TransactionMade(id, seller, buyer, amount);
     }
